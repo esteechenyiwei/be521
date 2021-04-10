@@ -44,13 +44,11 @@ sub3_train = sub3_ecog(1:len * p_train, :);
 %% patient 1
 all_feats1 = getWindowedFeats(sub1_train, fs, win_len, win_overlap);
 
-all_feats1 = normalize(all_feats1);
-
 % patient 2 features
-all_feats2 = normalize(getWindowedFeats(sub2_train, fs, win_len, win_overlap));
+all_feats2 = getWindowedFeats(sub2_train, fs, win_len, win_overlap);
 
 % patient 3 features
-all_feats3 = normalize(getWindowedFeats(sub3_train, fs, win_len, win_overlap));
+all_feats3 = getWindowedFeats(sub3_train, fs, win_len, win_overlap);
 
 
 %% Q3.2 Create R matrix
@@ -89,15 +87,73 @@ Ypred2 = R2 * f2;
 Ypred3 = R3 * f3;
 
 
+
 %% CALL THE MAKE PREDICTIONS FILE
 
 cd('/Users/qian/Desktop/BE521/homeworks/Final_Project_Competition');
 load('leaderboard_data.mat');
 
 
-pd = make_predictions(leaderboard_ecog, fs, win_len, win_overlap, N, f_values);
+predicted_dg = make_predictions(leaderboard_ecog, fs, win_len, win_overlap, N, f_values);
 
+%% (Kenneth) Test the interpolation method on training data and calculate average correlation 
+% duplicate the first and last row to have 6000 points for interpolation
+Ypred1_padded = cat(1, Ypred1(1, :), Ypred1);
+Ypred1_padded = cat(1, Ypred1_padded, Ypred1(length(Ypred1), :));
+Ypred2_padded = cat(1, Ypred2(1, :), Ypred2);
+Ypred2_padded = cat(1, Ypred2_padded, Ypred2(length(Ypred2), :));
+Ypred3_padded = cat(1, Ypred3(1, :), Ypred3);
+Ypred3_padded = cat(1, Ypred3_padded, Ypred3(length(Ypred3), :));
+% interpolate each subject to obtain 300000 prediction values
+predCell = cell({Ypred1_padded, Ypred2_padded, Ypred3_padded});
+predict_dg_train = cell(3, 1);
+for i = 1:3
+   content = predCell{1, i};
+   % interpolate each finger
+   v1 = spline(1:50:299951, content(:, 1), 1:1:300000)';
+   v2 = spline(1:50:299951, content(:, 2), 1:1:300000)';
+   v3 = spline(1:50:299951, content(:, 3), 1:1:300000)';
+   v4 = spline(1:50:299951, content(:, 4), 1:1:300000)';
+   v5 = spline(1:50:299951, content(:, 5), 1:1:300000)';
+   predict_dg_train{i, 1} = cat(2, v1, v2, v3, v4, v5);
+end
 
+% reduce the magnitude of the noise in background by multiplying a reducing
+% factor to all signal below a threshold
+for sub = 1:3
+    filtered = predict_dg_train{sub, 1};
+    for i = 1:len
+        if filtered(i) < 0.7
+            filtered(i) = filtered(i) * 0.1;
+%         else if filtered(i) > 1.3
+%             filtered(i) = filtered(i) * 2;
+%         end
+        end
+    end
+    predict_dg_train{sub, 1} = filtered;
+end
+    
+
+% calculate average correlation
+rho_sub1 = corr(sub1_dg, predict_dg_train{1, 1});
+rho_sub2 = corr(sub2_dg, predict_dg_train{2, 1});
+rho_sub3 = corr(sub3_dg, predict_dg_train{3, 1});
+corr_sub1 = diag(rho_sub1);
+corr_sub2 = diag(rho_sub2);
+corr_sub3 = diag(rho_sub3);
+% Only care about finger 1,2,3 and 5
+corr1 = (sum(corr_sub1) - corr_sub1(4))/4;
+corr2 = (sum(corr_sub2) - corr_sub2(4))/4;
+corr3 = (sum(corr_sub3) - corr_sub3(4))/4;
+avg_corr = (corr1 + corr2 + corr3)/3
+
+% plot segments of the predicted angles and the actual angles of subject 1
+figure(1)
+hold on
+pred1 = predict_dg_train{1, 1};
+plot(pred1(90000:110000), 'r');
+plot(sub1_dg(90000:110000), 'b');
+hold off
 
 %% predicted_dg, interpolation
 p = cell(1, 3);
@@ -149,6 +205,11 @@ test_prediction = make_predictions(train_ecog, fs, win_len, win_overlap, N, f_va
 
 
 %% get correlation
+% (Kenneth's comment) I think correlation needs to be calculated after
+% interpolation instead of calling corr() on the Y^ matrix and the
+% downsampled dataglove values. Also, the average correlation is calculated
+% as the average correlation of finger 1,2,3,5 for each subject. See my
+% section for the average correlation calculation
 rho_subject1 = zeros(1, 5);
 rho_subject2 = zeros(1, 5);
 rho_subject3 = zeros(1, 5);

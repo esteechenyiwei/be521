@@ -20,15 +20,14 @@ function [predicted_dg] = make_predictions(test_ecog, fs, win_len, win_overlap, 
     % get windowed features for the test data
 
     % patient 1
-    feats1 = normalize(getWindowedFeats(test_ecog{1}, fs, win_len, win_overlap));
+    feats1 = getWindowedFeats(test_ecog{1}, fs, win_len, win_overlap);
 
     % patient 2 features
-    feats2 = normalize(getWindowedFeats(test_ecog{2}, fs, win_len, win_overlap));
+    feats2 = getWindowedFeats(test_ecog{2}, fs, win_len, win_overlap);
     % patient 3 features
-    feats3 = normalize(getWindowedFeats(test_ecog{3}, fs, win_len, win_overlap));
+    feats3 = getWindowedFeats(test_ecog{3}, fs, win_len, win_overlap);
 
     R1test = create_R_matrix(feats1, N);
-
     R2test = create_R_matrix(feats2, N);
     R3test = create_R_matrix(feats3, N);
 
@@ -42,7 +41,8 @@ function [predicted_dg] = make_predictions(test_ecog, fs, win_len, win_overlap, 
     % each finger, for each subject
 
     
-    predicted_dg = cell({p1, p2, p3});
+    prediction = cell({p1, p2, p3});
+    predicted_dg = interpolation(prediction);
 
 end
 
