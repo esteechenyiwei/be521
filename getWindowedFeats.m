@@ -26,8 +26,9 @@ function [all_feats]=getWindowedFeats_release(raw_data, fs, window_length, windo
 %% Your code here (3 points)
 
 % First, filter the raw data
+    fprintf('\nFiltering raw data...');
     clean_data = filter_data(raw_data);
-
+    fprintf('Done filtering\n');
     
     % calculate the num of windows
     numchans = length(clean_data(1, :));
@@ -36,9 +37,14 @@ function [all_feats]=getWindowedFeats_release(raw_data, fs, window_length, windo
     windows_features_df = zeros(numWin, numchans * 6); % there are 6 features
     
     datasInWindow = window_length * fs; % how samples in the duration of window length
-
-    % Then, loop through sliding windows    
+    
+    % Then, loop through sliding windows  
+	n=0;
     for i = 1: numWin
+        fprintf(repmat('\b',1,n));
+        msg = sprintf('Window %d', i);
+        n = numel(msg);
+        fprintf(msg);
         % get the window bound
         up = (i - 1) * fs * (window_length - window_overlap) + 1; % how many displacements before this
         down = up + datasInWindow - 1;
