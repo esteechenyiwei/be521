@@ -1,6 +1,46 @@
 %% Final project part 2
 
-
+% Andrew's notes:
+% Trial 1: N = 5
+%   Test result: avg_corr = 0.7691
+%   Result: R = 0.4470
+% Trial 2: N = 5, used flatten_small_spikes.m
+%   Test result: avg_corr = 0.7688
+%   Result: R = 0.4409
+% Trial 3: N = 5, used flatten_small_spikes.m, numRuns = 3
+%   Test result: avg_corr = 0.7703
+%   Result: 0.4409
+% Trial 4: N = 4
+%   Test result: avg_corr = 0.7355
+%   Result: ?
+% Trial 5: N = 4, used flatten_small_spikes.m
+%   Test result: avg_corr = 0.7310
+%   Result: ?
+% Trial 6: N = 4, used flatten_small_spikes.m with spline setting instead
+% of just setting peaks to 0
+%   Test result: avg_corr = 0.7441
+%   Result: ?
+% Trial 7: N = 4, used flatten_small_spikes.m with spline setting instead
+% of just setting peaks to 0, thresholds: 0.2 to 1.5
+%   Test result: 0.7735
+%   Result: ?
+% Trial 8: N = 5, used flatten_small_spikes.m with spline setting instead
+% of just setting peaks to 0, thresholds: 0.2 to 1.5
+%   Test result: 0.7993
+%   Result: 0.4556
+% Trial 9: N = 7, used flatten_small_spikes.m with spline setting instead
+% of just setting peaks to 0, thresholds: 0.2 to 1.5
+%   Test result: 0.8437
+%   Result: 0.4442
+% Trial 10: N = 7, used flatten_small_spikes.m with spline setting instead
+% of just setting peaks to 0, thresholds: 0.2 to 1.5, 10 runs of flattening
+%   Test result: 0.8437
+%   Result: 0.4442  (?)
+% Trial 11: N = 7, used flatten_small_spikes.m with spline setting instead
+% of just setting peaks to 0, thresholds: 0.2 to 1.5, 10 runs of
+% flattening, +- 50 points
+%   Test result: 0.8437
+%   Result: 0.4588
 
 %% using the .mat file data (no need to load again)
 
@@ -11,7 +51,7 @@ load('raw_training_data.mat');
 p_train = 1;
 
 % N value in the create R matrix function
-N = 3;
+N = 7;
 
 % window length of the moving window, as well as overlap (in second)
 win_len = 0.1;
@@ -90,7 +130,7 @@ Ypred3 = R3 * f3;
 
 %% CALL THE MAKE PREDICTIONS FILE
 
-cd('/Users/qian/Desktop/BE521/homeworks/Final_Project_Competition');
+%cd('/Users/qian/Desktop/BE521/homeworks/Final_Project_Competition');
 load('leaderboard_data.mat');
 
 
@@ -132,7 +172,53 @@ for sub = 1:3
     end
     predict_dg_train{sub, 1} = filtered;
 end
-    
+
+% after noise reduction, flatten small spikes
+
+% set thresholds
+    max_threshold = 1.5;
+    min_threshold = .2;
+
+for run = 1:10
+    for sub = 1:3
+        thispatient = predict_dg_train{sub,1};
+        % loop through fingers
+        for finger = 1:5
+            flattened = thispatient(:,finger);
+
+            % store first and last element for final padding
+            %f_first = flattened(1);
+            %f_last = flattened(end);
+
+            % find where first derivative changes sign from positive to negative
+            index_d1 = diff(flattened)<0; % 1 = positive derivative, 0 = negative derivative
+             % 1 = neg to pos, 0 = no change, -1 = pos to neg.
+            index_d2 = diff(index_d1);
+            index_threshold = (flattened(2:end-1)>min_threshold) & (flattened(2:end-1)<max_threshold);
+            % find indices of nonzero elements.
+            % i.e., where threshold is passed AND pos to neg derivative
+            index_spikes = find(index_d2 .* index_threshold);
+
+            for spike = 1:size(index_spikes,1)
+                spikestart = index_spikes(spike,1)-50;
+                spikeend = index_spikes(spike,1)+50;
+
+                if spikestart < 0
+                    spikestart = 1;
+                end
+                if spikeend > 300000
+                    spikeend = 300000;
+                end
+
+                %flattened(spikestart:spikeend) = 0;
+                flattened(spikestart:spikeend) = spline([spikestart,spikeend],...
+                    [flattened(spikestart),flattened(spikeend)],...
+                    spikestart:spikeend);
+            end
+            predict_dg_train{sub, 1}(:,finger) = flattened;
+        end
+    end
+end
 
 % calculate average correlation
 rho_sub1 = corr(sub1_dg, predict_dg_train{1, 1});
@@ -151,84 +237,84 @@ avg_corr = (corr1 + corr2 + corr3)/3
 figure(1)
 hold on
 pred1 = predict_dg_train{1, 1};
-plot(pred1(90000:110000), 'r');
-plot(sub1_dg(90000:110000), 'b');
+plot(pred1(90000:140000), 'r');
+%plot([index_d1,1],'k');
+plot(sub1_dg(90000:140000), 'b');
 hold off
 
 %% predicted_dg, interpolation
-p = cell(1, 3);
-predicted_dg = cell(3, 1);
-
-% pad
-for i = 1:3
-   % add one more window to make interpolation easier
-   cell_content = pd{1, i};
-   p{1, i} = cat(1, cell_content, cell_content(size(cell_content, 1), :)); 
-   
-   v1 = spline(1:50:147451, p{1, i}(:, 1), 1:1:147500)';
-   v2 = spline(1:50:147451, p{1, i}(:, 2), 1:1:147500)';
-   v3 = spline(1:50:147451, p{1, i}(:, 3), 1:1:147500)';
-   v4 = spline(1:50:147451, p{1, i}(:, 4), 1:1:147500)';
-   v5 = spline(1:50:147451, p{1, i}(:, 5), 1:1:147500)';
-   % interpolate each finger
-   predicted_dg{i, 1} = cat(2, v1, v2, v3, v4, v5);
-   
-end
-
-% % no pad
+% p = cell(1, 3);
+% predicted_dg = cell(3, 1);
+% 
+% % pad
 % for i = 1:3
 %    % add one more window to make interpolation easier
 %    cell_content = pd{1, i};
+%    p{1, i} = cat(1, cell_content, cell_content(size(cell_content, 1), :)); 
 %    
-%    v1 = spline(1:50:147401, p{1, i}(:, 1), 1:1:147500)';
-%    v2 = spline(1:50:147401, p{1, i}(:, 2), 1:1:147500)';
-%    v3 = spline(1:50:147401, p{1, i}(:, 3), 1:1:147500)';
-%    v4 = spline(1:50:147401, p{1, i}(:, 4), 1:1:147500)';
-%    v5 = spline(1:50:147401, p{1, i}(:, 5), 1:1:147500)';
+%    v1 = spline(1:50:147451, p{1, i}(:, 1), 1:1:147500)';
+%    v2 = spline(1:50:147451, p{1, i}(:, 2), 1:1:147500)';
+%    v3 = spline(1:50:147451, p{1, i}(:, 3), 1:1:147500)';
+%    v4 = spline(1:50:147451, p{1, i}(:, 4), 1:1:147500)';
+%    v5 = spline(1:50:147451, p{1, i}(:, 5), 1:1:147500)';
 %    % interpolate each finger
-%    predicted_dg(i, 1} = cat(2, v1, v2, v3, v4, v5);
+%    predicted_dg{i, 1} = cat(2, v1, v2, v3, v4, v5);
 %    
 % end
-
-
-%% testing with parts of part 1 data
-
-cd('/Users/qian/Desktop/BE521/homeworks/Final_Project_Competition');
-load('final_proj_part1_data.mat');
-%%
-train_ecog{1, 1}(:, 62) =train_ecog{1, 1}(:, 61); 
-train_ecog{2, 1}(:, 47) =train_ecog{2, 1}(:, 46); 
-train_ecog{2, 1}(:, 48) =train_ecog{2, 1}(:, 46); 
-
-%%
-test_prediction = make_predictions(train_ecog, fs, win_len, win_overlap, N, f_values);
-
-
-%% get correlation
-% (Kenneth's comment) I think correlation needs to be calculated after
-% interpolation instead of calling corr() on the Y^ matrix and the
-% downsampled dataglove values. Also, the average correlation is calculated
-% as the average correlation of finger 1,2,3,5 for each subject. See my
-% section for the average correlation calculation
-rho_subject1 = zeros(1, 5);
-rho_subject2 = zeros(1, 5);
-rho_subject3 = zeros(1, 5);
-
-testy1 = get_target_matrix(train_dg{1, 1}, win_len, win_overlap, fs);
-testy2 = get_target_matrix(train_dg{1, 2}, win_len, win_overlap, fs);
-testy3 = get_target_matrix(train_dg{1, 3}, win_len, win_overlap, fs);
-
-for i = 1:5
-    rho_subject1(1, i) = corr(testy1(:, i), test_prediction{1, 1}(:, i));
-    rho_subject2(1, i) = corr(testy2(:, i), test_prediction{1, 2}(:, i));
-    rho_subject3(1, i) = corr(testy3(:, i), test_prediction{1, 3}(:, i));
-end
-
-% correlation for each finger for subject 1, 2, 3:
-rho_subject1
-rho_subject2
-rho_subject3
-
+% 
+% % % no pad
+% % for i = 1:3
+% %    % add one more window to make interpolation easier
+% %    cell_content = pd{1, i};
+% %    
+% %    v1 = spline(1:50:147401, p{1, i}(:, 1), 1:1:147500)';
+% %    v2 = spline(1:50:147401, p{1, i}(:, 2), 1:1:147500)';
+% %    v3 = spline(1:50:147401, p{1, i}(:, 3), 1:1:147500)';
+% %    v4 = spline(1:50:147401, p{1, i}(:, 4), 1:1:147500)';
+% %    v5 = spline(1:50:147401, p{1, i}(:, 5), 1:1:147500)';
+% %    % interpolate each finger
+% %    predicted_dg(i, 1} = cat(2, v1, v2, v3, v4, v5);
+% %    
+% % end
+% 
+% 
+% %% testing with parts of part 1 data
+% 
+% cd('/Users/qian/Desktop/BE521/homeworks/Final_Project_Competition');
+% load('final_proj_part1_data.mat');
+% %%
+% train_ecog{1, 1}(:, 62) =train_ecog{1, 1}(:, 61); 
+% train_ecog{2, 1}(:, 47) =train_ecog{2, 1}(:, 46); 
+% train_ecog{2, 1}(:, 48) =train_ecog{2, 1}(:, 46); 
+% 
+% %%
+% test_prediction = make_predictions(train_ecog, fs, win_len, win_overlap, N, f_values);
+% 
+% 
+% %% get correlation
+% % (Kenneth's comment) I think correlation needs to be calculated after
+% % interpolation instead of calling corr() on the Y^ matrix and the
+% % downsampled dataglove values. Also, the average correlation is calculated
+% % as the average correlation of finger 1,2,3,5 for each subject. See my
+% % section for the average correlation calculation
+% rho_subject1 = zeros(1, 5);
+% rho_subject2 = zeros(1, 5);
+% rho_subject3 = zeros(1, 5);
+% 
+% testy1 = get_target_matrix(train_dg{1, 1}, win_len, win_overlap, fs);
+% testy2 = get_target_matrix(train_dg{1, 2}, win_len, win_overlap, fs);
+% testy3 = get_target_matrix(train_dg{1, 3}, win_len, win_overlap, fs);
+% 
+% for i = 1:5
+%     rho_subject1(1, i) = corr(testy1(:, i), test_prediction{1, 1}(:, i));
+%     rho_subject2(1, i) = corr(testy2(:, i), test_prediction{1, 2}(:, i));
+%     rho_subject3(1, i) = corr(testy3(:, i), test_prediction{1, 3}(:, i));
+% end
+% 
+% % correlation for each finger for subject 1, 2, 3:
+% rho_subject1
+% rho_subject2
+% rho_subject3
 
 
 %% helper functions
