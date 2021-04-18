@@ -42,7 +42,7 @@ function [predicted_dg] = make_predictions(test_ecog, fs, win_len, win_overlap, 
 
     
     prediction = cell({p1, p2, p3});
-    predicted_dg = interpolation(prediction);
+    predicted_dg = flatten_small_spikes(interpolation(prediction));
 
 end
 
