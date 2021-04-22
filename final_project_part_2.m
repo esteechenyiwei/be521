@@ -134,7 +134,7 @@ Ypred3 = R3 * f3;
 load('leaderboard_data.mat');
 
 
-predicted_dg = make_predictions(leaderboard_ecog, fs, win_len, win_overlap, N, f_values);
+predicted_dg = make_predictions(leaderboard_ecog);
 
 %% (Kenneth) Test the interpolation method on training data and calculate average correlation 
 % duplicate the first and last row to have 6000 points for interpolation

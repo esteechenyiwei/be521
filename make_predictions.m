@@ -1,4 +1,4 @@
-function [predicted_dg] = make_predictions(test_ecog, fs, win_len, win_overlap, N, f_values)
+function [predicted_dg] = make_predictions(test_ecog)
 
 % INPUTS: test_ecog - 3 x 1 cell array containing ECoG for each subject, where test_ecog{i} 
 % to the ECoG for subject i. Each cell element contains a N x M testing ECoG,
@@ -14,7 +14,13 @@ function [predicted_dg] = make_predictions(test_ecog, fs, win_len, win_overlap, 
 
     %% optimal linear decode test 
 
-    % load the data
+    % load model
+    fs = 1000;
+    win_len = 0.1;
+    win_overlap = 0.05;
+    N = 7;
+    f_values_struct = load('f_values.mat');
+    f_values = f_values_struct.f_values;
     %%
 
     % get windowed features for the test data
